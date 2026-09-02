@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import os
 import sys
-import time
 import argparse
 
 class Style:
@@ -13,12 +12,16 @@ class Style:
     END = '\033[0m'
 
 MODELS = {
-    "1": {"name": "Random Forest", "script": "python train.py"},
+    "1": {"name": "Random Forest Regressor", "script": "python train.py --model rf"},
+    "2": {"name": "Gradient Boosting Regressor", "script": "python train.py --model gbm"},
+    "3": {"name": "Ridge Linear Regression", "script": "python train.py --model lr"}
 }
 
 DEPLOYMENTS = {
-    "1": {"name": "Local Docker (FastAPI)", "cmd": "docker-compose up --build -d"},
-    "2": {"name": "Kubernetes Cluster", "cmd": "kubectl apply -f k8s/deployment.yaml"},
+    "1": {"name": "Local Docker (FastAPI) & Monitoring", "cmd": "docker-compose up --build -d"},
+    "2": {"name": "BentoML Enterprise Serving (Local)", "cmd": "bentoml serve service_bento:HousePriceService"},
+    "3": {"name": "Serverless (Google Cloud Run)", "cmd": "gcloud run services replace cloudrun-service.yaml"},
+    "4": {"name": "Kubernetes Cluster", "cmd": "kubectl apply -f k8s/deployment.yaml"},
 }
 
 def interactive_prompt(title, options):
@@ -43,11 +46,31 @@ def execute_step(step_name, command):
         sys.exit(1)
 
 def main():
-    print(f"{Style.BOLD}{Style.GREEN}🚀 MLOps Pipeline Orchestrator{Style.END}")
-    selected_model = interactive_prompt("Select Training Model", MODELS)
+    parser = argparse.ArgumentParser(description="MLOps Pipeline Controller")
+    parser.add_argument("--model", type=str, choices=["rf", "gbm", "lr"], help="Bypass UI to select model")
+    parser.add_argument("--deploy", type=str, choices=["docker", "bentoml", "serverless", "k8s"], help="Bypass UI to select deployment")
+    args = parser.parse_args()
+
+    print(f"{Style.BOLD}{Style.GREEN}🚀 MLOps Pipeline Orchestrator v2{Style.END}")
+
+    # 1. Model Selection
+    selected_model = None
+    if args.model:
+        flag_to_key = {"rf": "1", "gbm": "2", "lr": "3"}
+        selected_model = MODELS[flag_to_key[args.model]]
+    else:
+        selected_model = interactive_prompt("Select Training Model", MODELS)
+
     execute_step(f"Training {selected_model['name']}", selected_model['script'])
     
-    selected_deploy = interactive_prompt("Select Deployment Target", DEPLOYMENTS)
+    # 2. Deployment Selection
+    selected_deploy = None
+    if args.deploy:
+        flag_to_key = {"docker": "1", "bentoml": "2", "serverless": "3", "k8s": "4"}
+        selected_deploy = DEPLOYMENTS[flag_to_key[args.deploy]]
+    else:
+        selected_deploy = interactive_prompt("Select Deployment Target", DEPLOYMENTS)
+
     execute_step(f"Deploying to {selected_deploy['name']}", selected_deploy['cmd'])
 
 if __name__ == "__main__":
